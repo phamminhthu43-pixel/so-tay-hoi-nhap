@@ -96,7 +96,7 @@
   .stage { flex: 1; min-height: 0; position: relative; display: flex; align-items: center; justify-content: center; padding: 18px 70px 8px; }
   .slide { height: 100%; display: flex; align-items: center; justify-content: center; }
   .slide img {
-    max-height: 100%; max-width: 100%; border-radius: 14px; background: #fff; cursor: zoom-in;
+    max-height: calc(100vh - var(--top) - 120px); max-width: 100%; border-radius: 14px; background: #fff; cursor: zoom-in;
     box-shadow: 0 30px 70px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.08);
   }
   .slide.in { animation: slideIn .45s cubic-bezier(.2,.8,.2,1); }
@@ -140,6 +140,44 @@
   .heart { position: fixed; top: -30px; z-index: 13; pointer-events: none; font-size: 22px; animation: fall linear forwards; }
   @keyframes fall { to { transform: translateY(110vh) rotate(360deg); opacity: .2; } }
 
+  /* ---------- Hiệu ứng chuyển động ---------- */
+  /* Các mục hiện lần lượt: gán --i cho từng mục để lệch thời gian */
+  .stagger > * { animation: popUp .55s cubic-bezier(.2,.9,.3,1.3) both; animation-delay: calc(var(--i, 0) * 70ms + var(--d, 0ms)); }
+  @keyframes popUp { from { opacity: 0; transform: translateY(14px) scale(.9); } }
+  .values > span:hover { border-color: var(--pink); color: #fff; transform: translateY(-2px); transition: all .2s; }
+  .app .topbar { animation: dropIn .6s cubic-bezier(.2,.8,.2,1) both; }
+  @keyframes dropIn { from { opacity: 0; transform: translateY(-100%); } }
+  /* Trang mở ra từ trên xuống, kèm vệt sáng lướt qua */
+  .slide .card { position: relative; display: inline-block; max-height: 100%; border-radius: 14px; overflow: hidden; }
+  .slide .card img { display: block; }
+  .slide.in .card, .slide.back .card { animation: reveal .8s cubic-bezier(.2,.8,.2,1) both; }
+  @keyframes reveal { from { clip-path: inset(0 0 100% 0 round 14px); transform: scale(1.04); } to { clip-path: inset(0 0 0 0 round 14px); } }
+  .slide .card::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(105deg, transparent 35%, rgba(255,255,255,.55) 50%, transparent 65%);
+    transform: translateX(-120%); animation: shine 1.3s .6s ease-out both;
+  }
+  @keyframes shine { to { transform: translateX(120%); } }
+  .count.bump { animation: bump .4s; }
+  @keyframes bump { 40% { transform: scale(1.35); color: #fff; } }
+  .caption .t { animation: slideUp .5s cubic-bezier(.2,.8,.2,1) both; }
+  @keyframes slideUp { from { opacity: 0; transform: translateY(12px); } }
+  .tips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .tips span {
+    font-size: 13px; line-height: 1.4; color: #e6e9ff; padding: 4px 10px; border-radius: 12px;
+    background: rgba(255,255,255,.08); border: 1px solid var(--line);
+  }
+  .tips span:first-child { border-color: rgba(255,61,127,.5); }
+  .grid.stagger > * { animation-name: thumbIn; }
+  @keyframes thumbIn { from { opacity: 0; transform: translateY(24px) rotate(-2deg) scale(.92); } }
+  .nav { animation: pulse 2.6s ease-in-out infinite; }
+  @keyframes pulse { 50% { box-shadow: 0 0 0 10px rgba(255,61,127,.0), 0 0 22px rgba(255,61,127,.35); } }
+  .mnav .ico.next { animation: nudge 1.8s ease-in-out infinite; }
+  @keyframes nudge { 50% { transform: translateX(3px); } }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
+
   .mnav { display: none; }
   .mnav .ico { width: 40px; height: 40px; }
   .mnav .ico.next { background: var(--pink); border-color: var(--pink); }
@@ -153,6 +191,7 @@
     .topbar { justify-content: space-between; }
     .stage { padding: 58px 0 0; display: block; overflow-y: auto; -webkit-overflow-scrolling: touch; }
     .slide { height: auto; display: block; padding: 10px 12px 12px; }
+    .slide .card { display: block; border-radius: 12px; }
     .slide img { width: 100%; max-height: none; border-radius: 12px; cursor: default; }
     .caption { padding: 10px 14px calc(12px + env(safe-area-inset-bottom)); background: rgba(8,12,45,.75); backdrop-filter: blur(14px); border-top: 1px solid var(--line); justify-content: space-between; }
     .caption .tag { display: none; }
@@ -174,7 +213,7 @@
     <div class="field"><input id="code" placeholder="Ví dụ: S0123" autocomplete="off" autocapitalize="characters" spellcheck="false" required></div>
     <button class="cta" id="go" type="submit">Mở sổ tay →</button>
     <div class="msg" id="msg"></div>
-    <div class="values"><span>Trách nhiệm</span><span>Kỷ luật</span><span>Cải tiến</span><span>Biết ơn</span><span>Tích cực</span><span>Đoàn kết</span><span>Uy tín</span></div>
+    <div class="values stagger" style="--d: 450ms"><span>Trách nhiệm</span><span>Kỷ luật</span><span>Cải tiến</span><span>Biết ơn</span><span>Tích cực</span><span>Đoàn kết</span><span>Uy tín</span></div>
   </form>
 </section>
 
@@ -182,7 +221,7 @@
 <section class="app hidden" id="app">
   <div class="topbar">
     <div class="brand"><span class="mini">QN</span>Quang Nhung <small>· Sổ tay hội nhập</small></div>
-    <nav class="chips" id="chips"></nav>
+    <nav class="chips stagger" id="chips" style="--d: 250ms"></nav>
     <div class="tools">
       <span class="count" id="count"></span>
       <button class="ico" id="menu" type="button" title="Mục lục" aria-label="Mục lục"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></button>
@@ -200,7 +239,7 @@
 
   <div class="caption" id="caption">
     <span class="tag" id="ctag"></span>
-    <div><div class="t" id="ctitle"></div><div class="tip" id="ctip"></div></div>
+    <div><div class="t" id="ctitle"></div><div class="tips stagger" id="ctip" style="--d: 200ms"></div></div>
     <div class="mnav">
       <button class="ico" id="mprev" type="button" aria-label="Trang trước"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg></button>
       <button class="ico next" id="mnext" type="button" aria-label="Trang sau"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M9 5l7 7-7 7"/></svg></button>
@@ -213,7 +252,7 @@
     <div><h2>Mục lục</h2><p id="seenInfo"></p></div>
     <button class="ico" id="closeMenu" type="button" aria-label="Đóng"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
   </div>
-  <div class="grid" id="grid"></div>
+  <div class="grid stagger" id="grid"></div>
 </div>
 
 <div class="zoom hidden" id="zoom"><img id="zoomImg" alt=""></div>
@@ -263,6 +302,11 @@ function pageUrl(i) {
   return urls[i];
 }
 
+// Đánh số thứ tự để các mục hiện lần lượt
+const numberKids = (el) => [...el.children].forEach((c, k) => c.style.setProperty('--i', k));
+const replay = (el, cls) => { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); };
+document.querySelectorAll('.stagger').forEach(numberKids);
+
 const chapterOf = (i) => meta.chapters.filter((c) => c.from <= i).pop();
 
 function buildChips() {
@@ -275,6 +319,7 @@ function buildChips() {
     b.onclick = () => go(c.from);
     $('chips').appendChild(b);
   });
+  numberKids($('chips'));
 }
 
 async function go(i, dir) {
@@ -287,6 +332,7 @@ async function go(i, dir) {
 
   const ch = chapterOf(i), p = meta.pages[i - 1];
   $('count').textContent = i + ' / ' + cfg.pages;
+  replay($('count'), 'bump');
   $('bar').style.width = (i / cfg.pages * 100) + '%';
   $('prev').disabled = $('mprev').disabled = i === 1;
   $('next').disabled = $('mnext').disabled = i === cfg.pages;
@@ -296,10 +342,18 @@ async function go(i, dir) {
     if (on) b.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
   });
   $('ctag').textContent = ch.name;
-  $('ctitle').textContent = p.title;
-  $('ctip').textContent = p.tip;
-  const cap = $('caption');
-  cap.classList.remove('pop'); void cap.offsetWidth; cap.classList.add('pop');
+  const t = $('ctitle');
+  t.textContent = p.title;
+  t.style.animation = 'none'; void t.offsetWidth; t.style.animation = '';
+  // Mỗi ý trong câu tóm tắt thành một nhãn nhỏ, hiện lần lượt
+  const tips = $('ctip');
+  tips.innerHTML = '';
+  p.tip.split(' · ').forEach((s) => {
+    const span = document.createElement('span');
+    span.textContent = s;
+    tips.appendChild(span);
+  });
+  numberKids(tips);
 
   const slide = $('slide');
   slide.innerHTML = '<div class="spinner"></div>';
@@ -309,8 +363,13 @@ async function go(i, dir) {
   img.src = src;
   img.alt = p.title;
   img.onclick = () => { if (innerWidth > 760) { $('zoomImg').src = src; $('zoom').classList.remove('hidden'); } };
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.appendChild(img);
   slide.innerHTML = '';
-  slide.appendChild(img);
+  slide.appendChild(card);
+  slide.className = 'slide';
+  void slide.offsetWidth;
   slide.className = 'slide ' + dir;
   $('stage').scrollTop = 0;
   if (i + 1 <= cfg.pages) pageUrl(i + 1);
@@ -355,6 +414,7 @@ async function openMenu() {
     b.innerHTML = '<div class="img"></div><div class="n">Trang ' + i + ' · ' + chapterOf(i).name + '</div><div class="nm"></div>' + (seen.has(i) ? '<span class="seen">✓</span>' : '');
     b.querySelector('.nm').textContent = p.title;
     b.onclick = () => { $('overlay').classList.add('hidden'); go(i); };
+    b.style.setProperty('--i', k);
     grid.appendChild(b);
     pageUrl(i).then((u) => { b.querySelector('.img').style.backgroundImage = 'url(' + u + ')'; });
   });
