@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Sổ tay hội nhập – Quang Nhung</title>
+<style>
+  :root { --navy: #1f2f8f; --pink: #e8336d; --bg: #f4f6fb; --card: #fff; --text: #1d2440; --muted: #6b7393; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); }
+  header { background: var(--navy); color: #fff; padding: 14px 16px; display: flex; align-items: center; gap: 10px; position: sticky; top: 0; z-index: 2; }
+  header .logo { background: #fff; color: var(--navy); font-weight: 800; border-radius: 8px; padding: 4px 8px; border-bottom: 3px solid var(--pink); }
+  header h1 { font-size: 17px; margin: 0; flex: 1; }
+  header button { background: transparent; color: #fff; border: 1px solid rgba(255,255,255,.5); border-radius: 8px; padding: 6px 10px; font-size: 13px; }
+  .lock { max-width: 420px; margin: 40px auto; padding: 0 16px; }
+  .card { background: var(--card); border-radius: 16px; padding: 24px 20px; box-shadow: 0 4px 20px rgba(31,47,143,.08); }
+  .card h2 { margin: 0 0 6px; color: var(--navy); font-size: 22px; }
+  .card p { margin: 0 0 18px; color: var(--muted); line-height: 1.5; }
+  label { font-weight: 600; font-size: 14px; }
+  input { width: 100%; font-size: 18px; padding: 12px 14px; margin: 8px 0 14px; border: 2px solid #d6dbee; border-radius: 10px; text-transform: uppercase; }
+  input:focus { outline: none; border-color: var(--navy); }
+  .btn { width: 100%; background: var(--pink); color: #fff; border: 0; border-radius: 10px; padding: 14px; font-size: 16px; font-weight: 700; cursor: pointer; }
+  .btn:disabled { opacity: .6; }
+  .msg { min-height: 22px; margin-top: 12px; font-size: 14px; color: #c62828; }
+  .msg.ok { color: var(--muted); }
+  .book { max-width: 820px; margin: 0 auto; padding: 12px 0 40px; }
+  .book img { display: block; width: 100%; height: auto; margin: 0 0 12px; background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,.08); }
+  .tools { display: flex; gap: 10px; padding: 0 16px 12px; }
+  .tools .btn { width: auto; flex: 1; padding: 12px; font-size: 15px; }
+  .tools .btn.alt { background: var(--navy); }
+  .hidden { display: none !important; }
+  footer { text-align: center; color: var(--muted); font-size: 12px; padding: 20px 16px 30px; }
+</style>
+</head>
+<body>
+<header>
+  <span class="logo">QN</span>
+  <h1>Sổ tay hội nhập</h1>
+  <button id="logout" class="hidden" type="button">Thoát</button>
+</header>
+
+<section class="lock" id="lock">
+  <form class="card" id="form">
+    <h2>Chào mừng Anh/Chị!</h2>
+    <p>Sổ tay dành riêng cho nhân viên Quang Nhung đang làm việc. Vui lòng nhập <b>mã nhân viên</b> để xem.</p>
+    <label for="code">Mã nhân viên</label>
+    <input id="code" autocomplete="off" autocapitalize="characters" spellcheck="false" required>
+    <button class="btn" id="go" type="submit">Mở sổ tay</button>
+    <div class="msg" id="msg"></div>
+  </form>
+</section>
+
+<section class="book hidden" id="book">
+  <div class="tools">
+    <button class="btn" id="dl" type="button">Tải file PDF</button>
+  </div>
+  <div id="pages"></div>
+</section>
+
+<footer>Công ty TNHH TM DV Quang Nhung · Tài liệu nội bộ, vui lòng không chia sẻ ra ngoài.</footer>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const b64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+const normalize = (s) => s.replace(/\s+/g, '').toUpperCase();
+const STORE = 'qn-so-tay-ma';
+let cfg, master;
+
+async function open(blob, key) {
+  const buf = new Uint8Array(blob);
+  return crypto.subtle.decrypt({ name: 'AES-GCM', iv: buf.slice(0, 12) }, key, buf.slice(12));
+}
+
+async function unlock(code) {
+  if (!cfg) cfg = await (await fetch('data/config.json', { cache: 'no-store' })).json();
+  const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(code), 'PBKDF2', false, ['deriveKey']);
+  const kek = await crypto.subtle.deriveKey({ name: 'PBKDF2', hash: 'SHA-256', salt: b64(cfg.salt), iterations: cfg.iter },
+    base, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
+  for (const k of cfg.keys) {
+    try {
+      const raw = await open(b64(k), kek);
+      return crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['decrypt']);
+    } catch (e) { /* không khớp, thử khoá tiếp theo */ }
+  }
+  return null;
+}
+
+async function fetchPlain(name) {
+  const res = await fetch('data/' + name);
+  return open(await res.arrayBuffer(), master);
+}
+
+async function showBook() {
+  $('lock').classList.add('hidden');
+  $('book').classList.remove('hidden');
+  $('logout').classList.remove('hidden');
+  const box = $('pages');
+  box.innerHTML = '';
+  for (let i = 1; i <= cfg.pages; i++) {
+    const img = document.createElement('img');
+    img.alt = 'Trang ' + i;
+    box.appendChild(img);
+    fetchPlain('p' + String(i).padStart(2, '0') + '.bin')
+      .then((data) => { img.src = URL.createObjectURL(new Blob([data], { type: 'image/jpeg' })); });
+  }
+}
+
+async function tryCode(code, remember) {
+  $('go').disabled = true;
+  $('msg').className = 'msg ok';
+  $('msg').textContent = 'Đang kiểm tra mã…';
+  try {
+    master = await unlock(code);
+  } catch (e) {
+    master = null;
+  }
+  $('go').disabled = false;
+  if (!master) {
+    $('msg').className = 'msg';
+    $('msg').textContent = 'Mã không đúng hoặc không còn hiệu lực. Vui lòng liên hệ Phòng HCNS.';
+    try { localStorage.removeItem(STORE); } catch (e) {}
+    return;
+  }
+  if (remember) { try { localStorage.setItem(STORE, code); } catch (e) {} }
+  $('msg').textContent = '';
+  showBook();
+}
+
+$('form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const code = normalize($('code').value);
+  if (code) tryCode(code, true);
+});
+
+$('dl').addEventListener('click', async () => {
+  $('dl').disabled = true;
+  const data = await fetchPlain('so-tay.bin');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([data], { type: 'application/pdf' }));
+  a.download = 'So tay hoi nhap - Quang Nhung.pdf';
+  a.click();
+  $('dl').disabled = false;
+});
+
+$('logout').addEventListener('click', () => {
+  try { localStorage.removeItem(STORE); } catch (e) {}
+  location.reload();
+});
+
+let saved = null;
+try { saved = localStorage.getItem(STORE); } catch (e) {}
+if (saved) tryCode(saved, false);
+</script>
+</body>
+</html>
