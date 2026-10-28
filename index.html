@@ -178,6 +178,15 @@
     *, *::before, *::after { animation: none !important; transition: none !important; }
   }
 
+  /* Trang làm bằng web (có chuyển động bên trong) */
+  .slide .webpage { position: relative; width: min(1040px, 100%); max-height: calc(100vh - var(--top) - 120px); overflow-y: auto; border-radius: 18px; box-shadow: 0 30px 70px rgba(0,0,0,.45); scrollbar-width: thin; }
+  .slide.in .webpage, .slide.back .webpage { animation: reveal .8s cubic-bezier(.2,.8,.2,1) both; }
+  .slide .wrapv { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; height: 100%; justify-content: center; }
+  .wrapv .webpage, .wrapv .card img { max-height: calc(100vh - var(--top) - 170px); }
+  .switch { flex: none; display: inline-flex; padding: 3px; border-radius: 99px; background: rgba(255,255,255,.08); border: 1px solid var(--line); }
+  .switch button { border: 0; background: none; padding: 6px 14px; border-radius: 99px; font-size: 12.5px; font-weight: 600; color: var(--muted); }
+  .switch button.on { background: #fff; color: #1b2160; }
+
   .mnav { display: none; }
   .mnav .ico { width: 40px; height: 40px; }
   .mnav .ico.next { background: var(--pink); border-color: var(--pink); }
@@ -192,10 +201,19 @@
     .stage { padding: 58px 0 0; display: block; overflow-y: auto; -webkit-overflow-scrolling: touch; }
     .slide { height: auto; display: block; padding: 10px 12px 12px; }
     .slide .card { display: block; border-radius: 12px; }
+    .slide .webpage { max-height: none; overflow: visible; border-radius: 14px; }
+    .slide .wrapv { display: block; text-align: center; }
+    .wrapv .webpage, .wrapv .card img { max-height: none; }
+    .slide .wrapv .switch { margin-bottom: 10px; }
+    .slide .wrapv > :not(.switch) { text-align: left; }
     .slide img { width: 100%; max-height: none; border-radius: 12px; cursor: default; }
     .caption { padding: 10px 14px calc(12px + env(safe-area-inset-bottom)); background: rgba(8,12,45,.75); backdrop-filter: blur(14px); border-top: 1px solid var(--line); justify-content: space-between; }
     .caption .tag { display: none; }
-    .caption .tip { font-size: 12.5px; }
+    .caption > div:nth-child(2) { min-width: 0; }
+    .tips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+    .tips::-webkit-scrollbar { display: none; }
+    .tips span { flex: none; font-size: 12px; white-space: nowrap; }
+    .tips span:only-child { white-space: normal; flex: 1; }
     .mnav { display: flex !important; gap: 8px; }
     .grid { grid-template-columns: repeat(2, 1fr); gap: 14px; }
   }
@@ -355,26 +373,74 @@ async function go(i, dir) {
   });
   numberKids(tips);
 
-  const slide = $('slide');
+  await renderSlide(i, dir);
+  if (i + 1 <= cfg.pages) pageUrl(i + 1);
+  if (i === cfg.pages) celebrate();
+}
+
+// Trang có bản web thì mặc định hiện bản động, có nút chuyển sang ảnh gốc
+const showOriginal = {};
+const webHtml = {};
+
+async function renderSlide(i, dir) {
+  const slide = $('slide'), p = meta.pages[i - 1];
   slide.innerHTML = '<div class="spinner"></div>';
-  const src = await pageUrl(i);
+  let content;
+  if (p.web && !showOriginal[i]) {
+    if (!webHtml[i]) webHtml[i] = new TextDecoder().decode(await fetchPlain(p.web));
+    content = document.createElement('div');
+    content.className = 'webpage';
+    content.innerHTML = webHtml[i];
+  } else {
+    const src = await pageUrl(i);
+    const img = new Image();
+    img.src = src;
+    img.alt = p.title;
+    img.onclick = () => { if (innerWidth > 760) { $('zoomImg').src = src; $('zoom').classList.remove('hidden'); } };
+    content = document.createElement('div');
+    content.className = 'card';
+    content.appendChild(img);
+  }
   if (cur !== i) return;
-  const img = new Image();
-  img.src = src;
-  img.alt = p.title;
-  img.onclick = () => { if (innerWidth > 760) { $('zoomImg').src = src; $('zoom').classList.remove('hidden'); } };
-  const card = document.createElement('div');
-  card.className = 'card';
-  card.appendChild(img);
   slide.innerHTML = '';
-  slide.appendChild(card);
+  if (p.web) {
+    const wrap = document.createElement('div');
+    wrap.className = 'wrapv';
+    const sw = document.createElement('div');
+    sw.className = 'switch';
+    sw.innerHTML = '<button type="button">✨ Bản động</button><button type="button">🖼 Bản gốc</button>';
+    sw.children[showOriginal[i] ? 1 : 0].classList.add('on');
+    sw.children[0].onclick = () => { showOriginal[i] = false; renderSlide(i, 'in'); };
+    sw.children[1].onclick = () => { showOriginal[i] = true; renderSlide(i, 'in'); };
+    wrap.append(sw, content);
+    slide.appendChild(wrap);
+  } else {
+    slide.appendChild(content);
+  }
   slide.className = 'slide';
   void slide.offsetWidth;
   slide.className = 'slide ' + dir;
   $('stage').scrollTop = 0;
-  if (i + 1 <= cfg.pages) pageUrl(i + 1);
-  if (i === cfg.pages) celebrate();
 }
+
+// Thẻ lật trong trang web: chạm để lật, lật đủ hết thì chúc mừng
+document.addEventListener('click', (e) => {
+  const fc = e.target.closest('[data-flip]');
+  if (!fc) return;
+  fc.classList.toggle('flipped');
+  fc.dataset.seen = '1';
+  const box = fc.closest('[data-explore]');
+  if (!box) return;
+  const all = box.querySelectorAll('[data-flip]');
+  const done = box.querySelectorAll('[data-flip][data-seen]').length;
+  box.querySelectorAll('[data-dots] i').forEach((d, k) => d.classList.toggle('on', k < done));
+  const msg = box.querySelector('[data-done]');
+  if (msg && done === all.length && !box.dataset.cheered) {
+    box.dataset.cheered = '1';
+    setTimeout(() => msg.classList.add('show'), 700);
+    setTimeout(() => msg.classList.remove('show'), 3500);
+  }
+});
 
 function celebrate() {
   if (store.get('qn-so-tay-xong')) return;
