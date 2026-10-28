@@ -179,10 +179,14 @@
   }
 
   /* Trang làm bằng web (có chuyển động bên trong) */
-  .slide .webpage { position: relative; width: min(1040px, 100%); max-height: calc(100vh - var(--top) - 120px); overflow-y: auto; border-radius: 18px; box-shadow: 0 30px 70px rgba(0,0,0,.45); scrollbar-width: thin; }
+  /* Trang web là một tờ dọc cỡ cố định, thu nhỏ vừa khung nên không bao giờ phải cuộn */
+  .slide .webpage { position: relative; flex: 1; min-height: 0; width: 100%; overflow: hidden; }
+  .slide.fit { width: 100%; }
+  .wrapv.fit .webpage { align-self: stretch; }
+  .webpage [data-sheet] { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
   .slide.in .webpage, .slide.back .webpage { animation: reveal .8s cubic-bezier(.2,.8,.2,1) both; }
   .slide .wrapv { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; height: 100%; justify-content: center; }
-  .wrapv .webpage, .wrapv .card img { max-height: calc(100vh - var(--top) - 170px); }
+  .wrapv .card img { max-height: calc(100vh - var(--top) - 170px); }
   .switch { flex: none; display: inline-flex; padding: 3px; border-radius: 99px; background: rgba(255,255,255,.08); border: 1px solid var(--line); }
   .switch button { border: 0; background: none; padding: 6px 14px; border-radius: 99px; font-size: 12.5px; font-weight: 600; color: var(--muted); }
   .switch button.on { background: #fff; color: #1b2160; }
@@ -201,9 +205,10 @@
     .stage { padding: 58px 0 0; display: block; overflow-y: auto; -webkit-overflow-scrolling: touch; }
     .slide { height: auto; display: block; padding: 10px 12px 12px; }
     .slide .card { display: block; border-radius: 12px; }
-    .slide .webpage { max-height: none; overflow: visible; border-radius: 14px; }
     .slide .wrapv { display: block; text-align: center; }
-    .wrapv .webpage, .wrapv .card img { max-height: none; }
+    .slide.fit { height: 100%; }
+    .slide .wrapv.fit { display: flex; height: 100%; }
+    .wrapv .card img { max-height: none; }
     .slide .wrapv .switch { margin-bottom: 10px; }
     .slide .wrapv > :not(.switch) { text-align: left; }
     .slide img { width: 100%; max-height: none; border-radius: 12px; cursor: default; }
@@ -412,34 +417,56 @@ async function renderSlide(i, dir) {
     sw.children[showOriginal[i] ? 1 : 0].classList.add('on');
     sw.children[0].onclick = () => { showOriginal[i] = false; renderSlide(i, 'in'); };
     sw.children[1].onclick = () => { showOriginal[i] = true; renderSlide(i, 'in'); };
+    if (content.className === 'webpage') wrap.classList.add('fit');
     wrap.append(sw, content);
     slide.appendChild(wrap);
   } else {
     slide.appendChild(content);
   }
-  slide.className = 'slide';
+  const fit = !!slide.querySelector('.wrapv.fit');
+  slide.className = 'slide' + (fit ? ' fit' : '');
   void slide.offsetWidth;
-  slide.className = 'slide ' + dir;
+  slide.className = 'slide ' + dir + (fit ? ' fit' : '');
+  fitSheet();
   $('stage').scrollTop = 0;
 }
 
-// Thẻ lật trong trang web: chạm để lật, lật đủ hết thì chúc mừng
+function fitSheet() {
+  const box = document.querySelector('.slide .webpage');
+  const sheet = box && box.querySelector('[data-sheet]');
+  if (!sheet) return;
+  const w = sheet.offsetWidth, h = sheet.offsetHeight;
+  const s = Math.min(box.clientWidth / w, box.clientHeight / h);
+  sheet.style.transform = `translate(${(box.clientWidth - w * s) / 2}px, ${(box.clientHeight - h * s) / 2}px) scale(${s})`;
+}
+addEventListener('resize', fitSheet);
+
+// Thẻ trong trang web: chạm để mở thẻ lớn ở giữa trang, xem đủ hết thì chúc mừng
 document.addEventListener('click', (e) => {
+  const box = e.target.closest('[data-explore]');
+  if (!box) return;
+  const pop = box.querySelector('[data-pop]');
+  const msg = box.querySelector('[data-done]');
+  const all = box.querySelectorAll('[data-flip]');
+  if (e.target.closest('[data-pop]')) {
+    pop.classList.remove('show');
+    const done = box.querySelectorAll('[data-flip][data-seen]').length;
+    if (msg && done === all.length && !box.dataset.cheered) {
+      box.dataset.cheered = '1';
+      setTimeout(() => msg.classList.add('show'), 300);
+      setTimeout(() => msg.classList.remove('show'), 3300);
+    }
+    return;
+  }
   const fc = e.target.closest('[data-flip]');
   if (!fc) return;
-  fc.classList.toggle('flipped');
   fc.dataset.seen = '1';
-  const box = fc.closest('[data-explore]');
-  if (!box) return;
-  const all = box.querySelectorAll('[data-flip]');
   const done = box.querySelectorAll('[data-flip][data-seen]').length;
   box.querySelectorAll('[data-dots] i').forEach((d, k) => d.classList.toggle('on', k < done));
-  const msg = box.querySelector('[data-done]');
-  if (msg && done === all.length && !box.dataset.cheered) {
-    box.dataset.cheered = '1';
-    setTimeout(() => msg.classList.add('show'), 700);
-    setTimeout(() => msg.classList.remove('show'), 3500);
-  }
+  pop.className = 'wv-pop ' + (fc.classList.contains('pink') ? 'pink' : 'navy');
+  pop.querySelector('[data-pop-body]').innerHTML = fc.querySelector('.fc-ico').outerHTML + fc.querySelector('.fc-b').innerHTML;
+  void pop.offsetWidth;
+  pop.classList.add('show');
 });
 
 function celebrate() {
@@ -539,7 +566,7 @@ $('dl').onclick = async () => {
 
 document.addEventListener('keydown', (e) => {
   if ($('app').classList.contains('hidden')) return;
-  if (e.key === 'Escape') { $('overlay').classList.add('hidden'); $('zoom').classList.add('hidden'); }
+  if (e.key === 'Escape') { $('overlay').classList.add('hidden'); $('zoom').classList.add('hidden'); document.querySelectorAll('[data-pop].show').forEach((p) => p.classList.remove('show')); }
   if (!$('overlay').classList.contains('hidden') || !$('zoom').classList.contains('hidden')) return;
   if (e.key === 'ArrowRight') go(cur + 1, 'in');
   if (e.key === 'ArrowLeft') go(cur - 1, 'back');
